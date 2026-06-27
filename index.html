@@ -340,6 +340,46 @@ function logSpend() {
 }
 window.logSpend = logSpend;
 
+// ── SAVINGS METER ─────────────────────────────────────────────────────────────
+function renderSavingsMeter(total) {
+  // Scale: -500 (buckle down) to +500 (rolling in it), clamped
+  const MIN = -500, MAX = 500;
+  const clamped = Math.max(MIN, Math.min(MAX, total));
+  const pct = (clamped - MIN) / (MAX - MIN); // 0..1
+
+  // Zone boundaries (as fractions of the bar)
+  const zones = [
+    { label: 'Buckle Down',    end: 0.25, color: '#ef4444' },
+    { label: 'Slow Your Roll', end: 0.50, color: '#f97316' },
+    { label: 'Doing Great',    end: 0.75, color: '#eab308' },
+    { label: 'Rolling In It',  end: 1.00, color: '#22c55e' },
+  ];
+
+  const activeZone = zones.find(z => pct <= z.end) || zones[3];
+
+  const markerPct = (pct * 100).toFixed(1);
+
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:10px">🌡 How on track am I?</div>
+      <div style="position:relative;height:28px;border-radius:14px;margin:0 6px 8px">
+        <div style="position:absolute;inset:0;border-radius:14px;background:linear-gradient(to right,#ef4444 0%,#f97316 33%,#eab308 66%,#22c55e 100%);opacity:0.85"></div>
+        <div style="position:absolute;top:0;bottom:0;left:25%;width:1px;background:rgba(0,0,0,0.25)"></div>
+        <div style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(0,0,0,0.25)"></div>
+        <div style="position:absolute;top:0;bottom:0;left:75%;width:1px;background:rgba(0,0,0,0.25)"></div>
+        <div style="position:absolute;top:-4px;bottom:-4px;left:calc(${markerPct}% - 3px);width:6px;background:#fff;border-radius:3px;box-shadow:0 0 0 2px ${activeZone.color},0 2px 6px rgba(0,0,0,0.5);z-index:2"></div>
+      </div>
+      <div style="display:flex;margin:0 6px 10px">
+        <div style="flex:1;text-align:center;font-size:0.58rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.04em">Buckle<br>Down</div>
+        <div style="flex:1;text-align:center;font-size:0.58rem;font-weight:700;color:#f97316;text-transform:uppercase;letter-spacing:0.04em">Slow Your<br>Roll</div>
+        <div style="flex:1;text-align:center;font-size:0.58rem;font-weight:700;color:#eab308;text-transform:uppercase;letter-spacing:0.04em">Doing<br>Great</div>
+        <div style="flex:1;text-align:center;font-size:0.58rem;font-weight:700;color:#22c55e;text-transform:uppercase;letter-spacing:0.04em">Rolling<br>In It</div>
+      </div>
+      <div style="text-align:center;font-size:0.75rem;font-weight:700;color:${activeZone.color}">${activeZone.label.toUpperCase()} · net ${total < 0 ? '–' : '+'}${fmt(Math.abs(total))}</div>
+    </div>
+  `;
+}
+
 // ── SAVINGS ───────────────────────────────────────────────────────────────────
 function renderSavings() {
   const td = today();
@@ -357,6 +397,8 @@ function renderSavings() {
   return `
     <h1>Savings Tracker</h1>
     <p class="subtitle">Under = saved · Over = lost · net total</p>
+
+    ${renderSavingsMeter(total)}
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
       <div class="card" style="margin-bottom:0;text-align:center;padding:14px 8px">
