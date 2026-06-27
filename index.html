@@ -614,7 +614,17 @@ window.delTx = delTx;
 
 // Seed known past transactions if not already present
 const SEED = [
-  { id: 'seed-0622', amount: 7.83,  description: 'Muni rides',                              category: 'Daily Spend', date: '2026-06-22' },
+  // Week 1 (Jun 1–7)
+  { id: 'seed-w1-daily', amount: 387,   description: 'Week 1 daily spend',   category: 'Daily Spend', date: '2026-06-05' },
+  { id: 'seed-w1-groc',  amount: 237,   description: 'Week 1 groceries',     category: 'Groceries',   date: '2026-06-05' },
+  // Week 2 (Jun 8–14)
+  { id: 'seed-w2-daily', amount: 363,   description: 'Week 2 daily spend',   category: 'Daily Spend', date: '2026-06-12' },
+  { id: 'seed-w2-groc',  amount: 82,    description: 'Week 2 groceries',     category: 'Groceries',   date: '2026-06-12' },
+  // Week 3 (Jun 15–21)
+  { id: 'seed-w3-daily', amount: 361,   description: 'Week 3 daily spend',   category: 'Daily Spend', date: '2026-06-19' },
+  { id: 'seed-w3-groc',  amount: 83,    description: 'Week 3 groceries',     category: 'Groceries',   date: '2026-06-19' },
+  // Week 4 (Jun 22–28)
+  { id: 'seed-0622', amount: 7.83,  description: 'Muni rides',                               category: 'Daily Spend', date: '2026-06-22' },
   { id: 'seed-0623', amount: 92.91, description: 'SAJJ Med $29 + Shoreline $21 + rides $43', category: 'Daily Spend', date: '2026-06-23' },
   { id: 'seed-0624', amount: 75.63, description: '405 Howard $26 + 7-Eleven $6 + rides $43', category: 'Daily Spend', date: '2026-06-24' },
   { id: 'seed-0625', amount: 61,    description: 'Thu Jun 25 spend',                          category: 'Daily Spend', date: '2026-06-25' },
