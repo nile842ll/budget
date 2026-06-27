@@ -172,39 +172,46 @@ function spendOn(dateStr, cat) {
 function spendWeek(wi, cat) {
   return weekDates(wi).reduce((s,d)=>s+spendOn(d,cat),0);
 }
-// Saved on a day = max(0, budget - daily_spend). Negative = over, not negative savings.
-function savedOn(dateStr) {
-  const budget = DAILY_BUDGET(dateStr);
-  const spent = spendOn(dateStr, 'Daily Spend');
-  return budget - spent; // can be negative (over)
+// Weeks with lumped seed data (not individual days) — use weekly net instead of per-day
+const WEEKLY_SEED_WEEKS = [0, 1, 2]; // Week indices 0,1,2 = weeks 1,2,3
+
+function weeklyDailyNet(wi) {
+  // Net = weekly daily budget - total daily spent that week
+  return WEEKS[wi].dailyBudget - spendWeek(wi, 'Daily Spend');
 }
-// All past days (including today) in tracked weeks
-function allTrackedPastDays() {
+function weeklyGrocNet(wi) {
+  return GROC_BUDGET(wi) - spendWeek(wi, 'Groceries');
+}
+
+function savedOn(dateStr) {
+  return DAILY_BUDGET(dateStr) - spendOn(dateStr, 'Daily Spend');
+}
+
+// Only days in weeks NOT covered by weekly seed (i.e. week 4+)
+function trackedDailyDays() {
   const td = today();
   const days = [];
   WEEKS.forEach((w,wi) => {
+    if (WEEKLY_SEED_WEEKS.includes(wi)) return;
     weekDates(wi).forEach(d => { if (d <= td) days.push({date:d, wi}); });
   });
   return days;
 }
+
 function totalDailySaved() {
-  // Sum of positive daily savings only (don't let over-days subtract from total)
-  return allTrackedPastDays().reduce((s,{date}) => {
-    const sv = savedOn(date);
-    return s + (sv > 0 ? sv : 0);
-  }, 0);
+  // Past weeks (seeded as weekly totals)
+  const weeklyNet = WEEKLY_SEED_WEEKS.reduce((s, wi) => s + weeklyDailyNet(wi), 0);
+  // Current + future individual days
+  const dailyNet = trackedDailyDays().reduce((s,{date}) => s + savedOn(date), 0);
+  return weeklyNet + dailyNet;
 }
+
 function totalGrocSaved() {
   const td = today();
-  let saved = 0;
-  WEEKS.forEach((w,wi) => {
-    if (w.end <= td) { // only count completed weeks
-      const g = spendWeek(wi,'Groceries');
-      const budget = GROC_BUDGET(wi);
-      if (g < budget) saved += budget - g;
-    }
-  });
-  return saved;
+  return WEEKS.reduce((s, w, wi) => {
+    if (w.start > td) return s; // future week
+    return s + weeklyGrocNet(wi);
+  }, 0);
 }
 
 // ── Render engine ─────────────────────────────────────────────────────────────
@@ -340,31 +347,46 @@ function renderSavings() {
   const grocSaved = totalGrocSaved();
   const total = dailySaved + grocSaved;
 
-  // Build per-day savings for past days
-  const days = allTrackedPastDays().reverse(); // most recent first
+  const dailyColor = dailySaved >= 0 ? 'var(--green)' : 'var(--red)';
+  const grocColor  = grocSaved  >= 0 ? 'var(--groc)'  : 'var(--red)';
+  const totalColor = total       >= 0 ? 'var(--accent)': 'var(--red)';
+
+  // Per-day rows for week 4+ only
+  const days = trackedDailyDays().reverse();
 
   return `
     <h1>Savings Tracker</h1>
-    <p class="subtitle">Money you kept under budget each day</p>
+    <p class="subtitle">Under = saved · Over = lost · net total</p>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
       <div class="card" style="margin-bottom:0;text-align:center;padding:14px 8px">
-        <div class="card-title" style="margin-bottom:6px">Daily</div>
-        <div style="font-size:1.3rem;font-weight:800;color:var(--green)">${fmt(dailySaved)}</div>
+        <div class="card-title" style="margin-bottom:6px">Daily net</div>
+        <div style="font-size:1.3rem;font-weight:800;color:${dailyColor}">${dailySaved < 0 ? '–' : '+'}${fmt(Math.abs(dailySaved))}</div>
       </div>
       <div class="card" style="margin-bottom:0;text-align:center;padding:14px 8px">
-        <div class="card-title" style="margin-bottom:6px">Grocery</div>
-        <div style="font-size:1.3rem;font-weight:800;color:var(--groc)">${fmt(grocSaved)}</div>
+        <div class="card-title" style="margin-bottom:6px">Grocery net</div>
+        <div style="font-size:1.3rem;font-weight:800;color:${grocColor}">${grocSaved < 0 ? '–' : '+'}${fmt(Math.abs(grocSaved))}</div>
       </div>
       <div class="card" style="margin-bottom:0;text-align:center;padding:14px 8px">
-        <div class="card-title" style="margin-bottom:6px">Total</div>
-        <div style="font-size:1.3rem;font-weight:800;color:var(--accent)">${fmt(total)}</div>
+        <div class="card-title" style="margin-bottom:6px">Total net</div>
+        <div style="font-size:1.3rem;font-weight:800;color:${totalColor}">${total < 0 ? '–' : '+'}${fmt(Math.abs(total))}</div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Daily savings log</div>
-      ${days.map(({date, wi}) => {
+      <div class="card-title">Daily spend — by week</div>
+      ${WEEKLY_SEED_WEEKS.map(wi => {
+        const net = weeklyDailyNet(wi);
+        const isOver = net < 0;
+        const spent = spendWeek(wi,'Daily Spend');
+        return `<div class="savings-row">
+          <span class="savings-day">${WEEKS[wi].label} (${md(WEEKS[wi].start)}–${md(WEEKS[wi].end)})</span>
+          <span style="font-size:0.75rem;color:var(--muted)">${fmt(spent)} / ${fmt(WEEKS[wi].dailyBudget)}</span>
+          <span class="savings-amt" style="color:${isOver?'var(--red)':'var(--green)'}">${isOver?'–':'+'}${fmt(Math.abs(net))}</span>
+        </div>`;
+      }).join('')}
+      <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;font-size:0.75rem;font-weight:700;color:var(--muted);margin-bottom:4px">WEEK 4 — PER DAY</div>
+      ${days.map(({date}) => {
         const budget = DAILY_BUDGET(date);
         const spent = spendOn(date, 'Daily Spend');
         const saved = budget - spent;
@@ -373,33 +395,33 @@ function renderSavings() {
         return `<div class="savings-row">
           <span class="savings-day">${dayName(date)} ${md(date)}${isToday?' · today':''}</span>
           <span style="font-size:0.75rem;color:var(--muted)">${fmt(spent)} / ${fmt(budget)}</span>
-          <span class="savings-amt" style="color:${isOver?'var(--red)':'var(--green)'}">${isOver ? '–'+fmt(-saved) : '+'+fmt(saved)}</span>
+          <span class="savings-amt" style="color:${isOver?'var(--red)':'var(--green)'}">${isOver?'–':'+'}${fmt(Math.abs(saved))}</span>
         </div>`;
       }).join('')}
       <div class="savings-total-row">
-        <span>Daily total saved</span>
-        <span style="color:var(--green)">${fmt(dailySaved)}</span>
+        <span>Daily net total</span>
+        <span style="color:${dailyColor}">${dailySaved<0?'–':'+'}${fmt(Math.abs(dailySaved))}</span>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Grocery savings by week</div>
+      <div class="card-title">Grocery spend — by week</div>
       ${WEEKS.map((w,wi) => {
         const isPast = w.end < td;
         const isCurrent = td >= w.start && td <= w.end;
+        if (!isPast && !isCurrent) return `<div class="savings-row"><span class="savings-day">${w.label}</span><span class="muted" style="font-size:0.75rem">upcoming</span><span class="muted">—</span></div>`;
         const gBudget = GROC_BUDGET(wi);
         const gSpent = spendWeek(wi,'Groceries');
         const saved = gBudget - gSpent;
         const isOver = saved < 0;
-        if (!isPast && !isCurrent) return `<div class="savings-row"><span class="savings-day">${w.label}</span><span class="muted">upcoming</span><span class="muted">—</span></div>`;
         return `<div class="savings-row">
           <span class="savings-day">${w.label}${isCurrent?' · now':''}</span>
           <span style="font-size:0.75rem;color:var(--muted)">${fmt(gSpent)} / ${fmt(gBudget)}</span>
-          <span class="savings-amt" style="color:${isOver?'var(--red)': isCurrent ? 'var(--groc)':'var(--green)'}">${isOver ? '–'+fmt(-saved) : (isCurrent?'':'+') + fmt(saved)}</span>
+          <span class="savings-amt" style="color:${isOver?'var(--red)':isCurrent?'var(--groc)':'var(--green)'}">${isOver?'–':'+'}${fmt(Math.abs(saved))}</span>
         </div>`;
       }).join('')}
       <div class="savings-total-row">
-        <span>Grocery total saved</span>
+        <span>Grocery net total</span>
         <span style="color:var(--groc)">${fmt(grocSaved)}</span>
       </div>
     </div>
