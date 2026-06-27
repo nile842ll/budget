@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Budget</title>
+<style>
+  :root {
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #6366f1;
+    --groc: #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .app { max-width: 480px; margin: 0 auto; padding: 20px 14px 88px; }
+
+  /* Bottom nav */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); display: flex; max-width: 480px; margin: 0 auto; left: 50%; transform: translateX(-50%); width: 100%; }
+  .bottom-nav button { flex: 1; padding: 10px 4px 12px; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.65rem; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 3px; letter-spacing: 0.03em; text-transform: uppercase; }
+  .bottom-nav button.active { color: var(--accent); }
+  .nav-icon { font-size: 1.2rem; line-height: 1; }
+
+  /* Cards */
+  .card { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+  .card-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; }
+
+  /* Circle */
+  .circle-wrap { display: flex; flex-direction: column; align-items: center; padding: 8px 0 4px; }
+  .circle-svg { transform: rotate(-90deg); }
+  .circle-track { fill: none; stroke: var(--border); stroke-width: 10; }
+  .circle-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease, stroke 0.3s; }
+  .circle-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .circle-container { position: relative; width: 180px; height: 180px; }
+  .circle-amount { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+  .circle-label { font-size: 0.72rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+  .circle-sublabel { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
+  /* Two stat pills below circle */
+  .pill-row { display: flex; gap: 10px; margin-top: 14px; width: 100%; }
+  .pill { flex: 1; background: var(--bg); border-radius: 10px; padding: 10px 12px; border: 1px solid var(--border); text-align: center; }
+  .pill-label { font-size: 0.65rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .pill-value { font-size: 1.1rem; font-weight: 700; }
+
+  /* Quick add on Today */
+  .quick-input { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .quick-input input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 9px; font-size: 1rem; outline: none; }
+  .quick-input input:focus { border-color: var(--accent); }
+  .quick-input select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 8px; border-radius: 9px; font-size: 0.82rem; outline: none; }
+  .quick-input select:focus { border-color: var(--accent); }
+  .btn-add { background: var(--accent); color: #fff; border: none; border-radius: 9px; padding: 10px 18px; font-size: 0.9rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .btn-add:active { opacity: 0.8; }
+
+  /* Grocery bar */
+  .groc-bar-wrap { margin-top: 6px; }
+  .groc-bar-labels { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); margin-bottom: 5px; }
+  .groc-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .groc-bar-fill { height: 100%; border-radius: 4px; background: var(--groc); transition: width 0.4s; }
+  .groc-bar-fill.over { background: var(--red); }
+
+  /* Savings list */
+  .savings-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .savings-row:last-child { border-bottom: none; }
+  .savings-day { color: var(--muted); }
+  .savings-amt { font-weight: 700; }
+  .savings-total-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 2px; font-size: 0.9rem; font-weight: 700; border-top: 2px solid var(--border); margin-top: 4px; }
+
+  /* Tx list */
+  .tx-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+  .tx-item { display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border); }
+  .tx-icon { font-size: 1rem; flex-shrink: 0; }
+  .tx-desc { flex: 1; font-size: 0.83rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx-meta { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+  .tx-amount { font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
+  .btn-del { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 2px 4px; }
+  .btn-del:hover { color: var(--red); }
+
+  /* Week grid */
+  .day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .day-cell { background: var(--bg); border-radius: 7px; padding: 7px 3px; border: 1px solid var(--border); text-align: center; }
+  .day-cell.today { border-color: var(--accent); }
+  .day-cell.saved { border-color: var(--green); }
+  .day-cell.over { border-color: var(--red); }
+  .dc-name { font-size: 0.58rem; color: var(--muted); font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+  .dc-date { font-size: 0.62rem; color: var(--muted); margin-bottom: 4px; }
+  .dc-spent { font-size: 0.82rem; font-weight: 700; }
+  .dc-saved { font-size: 0.62rem; margin-top: 2px; font-weight: 600; }
+
+  /* Overview table */
+  .ov-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .ov-table th, .ov-table td { padding: 9px 8px; border-bottom: 1px solid var(--border); }
+  .ov-table th { color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
+  .ov-table th:first-child, .ov-table td:first-child { text-align: left; }
+  .ov-table td { text-align: right; }
+  .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; display: inline-block; }
+  .badge.over { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge.now { background: rgba(99,102,241,0.2); color: #a5b4fc; }
+
+  /* Form */
+  .form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .form-field label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .form-field input, .form-field select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 9px; font-size: 0.95rem; outline: none; width: 100%; }
+  .form-field input:focus, .form-field select:focus { border-color: var(--accent); }
+  .btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 9px; padding: 12px; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 4px; }
+  .btn-primary:active { opacity: 0.85; }
+
+  h1 { font-size: 1.3rem; font-weight: 800; margin-bottom: 2px; }
+  .subtitle { color: var(--muted); font-size: 0.8rem; margin-bottom: 16px; }
+  .empty { text-align: center; color: var(--muted); padding: 20px; font-size: 0.85rem; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: none; }
+  .muted { color: var(--muted); }
+  .green { color: var(--green); }
+  .red { color: var(--red); }
+  .yellow { color: var(--yellow); }
+  .cyan { color: var(--groc); }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<nav class="bottom-nav" id="nav"></nav>
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const WEEKS = [
+  { label:'Week 1', start:'2026-06-01', end:'2026-06-07', dailyBudget:385 },
+  { label:'Week 2', start:'2026-06-08', end:'2026-06-14', dailyBudget:385 },
+  { label:'Week 3', start:'2026-06-15', end:'2026-06-21', dailyBudget:385 },
+  { label:'Week 4', start:'2026-06-22', end:'2026-06-28', dailyBudget:385 },
+  { label:'Week 5', start:'2026-06-29', end:'2026-07-05', dailyBudget:385 },
+  { label:'Week 6', start:'2026-07-06', end:'2026-07-12', dailyBudget:385 },
+];
+const GROC_BUDGET = () => 90;
+const DAILY_BUDGET = (dateStr) => {
+  const day = new Date(dateStr + 'T12:00:00').getDay();
+  return (day === 0 || day === 5 || day === 6) ? 75 : 40;
+};
+const HOUSING = 6500;
+const START_BAL = 14121;
+const SAVINGS_GOAL = 1000;
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const persist = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+let txs = load('txs', []);
+let page = 'today';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmt = (n) => '$' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const md = (s) => { const d = new Date(s+'T12:00:00'); return d.toLocaleString('en',{month:'short'})+' '+d.getDate(); };
+const dayName = (s, short=true) => new Date(s+'T12:00:00').toLocaleString('en',{weekday: short ? 'short' : 'long'});
+
+function weekIdx(dateStr) {
+  return WEEKS.findIndex(w => dateStr >= w.start && dateStr <= w.end);
+}
+function weekDates(wi) {
+  const dates = []; let d = new Date(WEEKS[wi].start+'T12:00:00');
+  for (let i=0;i<7;i++) { dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+  return dates;
+}
+function spendOn(dateStr, cat) {
+  return txs.filter(t => t.date===dateStr && (cat ? t.category===cat : t.category!=='Other'))
+            .reduce((s,t)=>s+t.amount, 0);
+}
+function spendWeek(wi, cat) {
+  return weekDates(wi).reduce((s,d)=>s+spendOn(d,cat),0);
+}
+// Saved on a day = max(0, budget - daily_spend). Negative = over, not negative savings.
+function savedOn(dateStr) {
+  const budget = DAILY_BUDGET(dateStr);
+  const spent = spendOn(dateStr, 'Daily Spend');
+  return budget - spent; // can be negative (over)
+}
+// All past days (including today) in tracked weeks
+function allTrackedPastDays() {
+  const td = today();
+  const days = [];
+  WEEKS.forEach((w,wi) => {
+    weekDates(wi).forEach(d => { if (d <= td) days.push({date:d, wi}); });
+  });
+  return days;
+}
+function totalDailySaved() {
+  // Sum of positive daily savings only (don't let over-days subtract from total)
+  return allTrackedPastDays().reduce((s,{date}) => {
+    const sv = savedOn(date);
+    return s + (sv > 0 ? sv : 0);
+  }, 0);
+}
+function totalGrocSaved() {
+  const td = today();
+  let saved = 0;
+  WEEKS.forEach((w,wi) => {
+    if (w.end <= td) { // only count completed weeks
+      const g = spendWeek(wi,'Groceries');
+      const budget = GROC_BUDGET(wi);
+      if (g < budget) saved += budget - g;
+    }
+  });
+  return saved;
+}
+
+// ── Render engine ─────────────────────────────────────────────────────────────
+function render() {
+  document.getElementById('nav').innerHTML = [
+    {id:'today',icon:'○',label:'Today'},
+    {id:'savings',icon:'↑',label:'Savings'},
+    {id:'week',icon:'▦',label:'Week'},
+    {id:'overview',icon:'≡',label:'Overview'},
+    {id:'history',icon:'◷',label:'History'},
+  ].map(n=>`<button class="${page===n.id?'active':''}" onclick="go('${n.id}')"><span class="nav-icon">${n.icon}</span>${n.label}</button>`).join('');
+
+  const views = {today:renderToday, savings:renderSavings, week:renderWeek, overview:renderOverview, history:renderHistory};
+  document.getElementById('app').innerHTML = (views[page] || renderToday)();
+}
+function go(p) { page=p; render(); }
+window.go = go;
+
+// ── TODAY ─────────────────────────────────────────────────────────────────────
+function renderToday() {
+  const td = today();
+  const budget = DAILY_BUDGET(td);
+  const spent = spendOn(td, 'Daily Spend');
+  const left = budget - spent;
+  const pct = Math.min(spent / budget, 1);
+  const isOver = spent > budget;
+  const color = isOver ? 'var(--red)' : pct > 0.8 ? 'var(--yellow)' : 'var(--green)';
+
+  const wi = weekIdx(td);
+  const gBudget = wi >= 0 ? GROC_BUDGET(wi) : 90;
+  const gSpent = wi >= 0 ? spendWeek(wi,'Groceries') : 0;
+  const gLeft = gBudget - gSpent;
+  const gPct = Math.min(gSpent / gBudget, 1);
+  const gOver = gSpent > gBudget;
+
+  const todayTxs = txs.filter(t=>t.date===td);
+  const r = 80; const circ = 2 * Math.PI * r;
+  const dash = circ * pct;
+  const d = new Date(td+'T12:00:00');
+  const dateLabel = d.toLocaleString('en',{weekday:'long',month:'long',day:'numeric'});
+
+  return `
+    <h1>Today</h1>
+    <p class="subtitle">${dateLabel}</p>
+
+    <div class="card" style="text-align:center">
+      <div class="circle-wrap">
+        <div class="circle-container">
+          <svg class="circle-svg" width="180" height="180" viewBox="0 0 180 180">
+            <circle class="circle-track" cx="90" cy="90" r="${r}"/>
+            <circle id="circle-fill" class="circle-fill" cx="90" cy="90" r="${r}"
+              stroke="${color}"
+              stroke-dasharray="${circ}"
+              stroke-dashoffset="${circ - dash}"/>
+          </svg>
+          <div class="circle-center">
+            <div id="circle-amount" class="circle-amount" style="color:${color}">${fmt(spent)}</div>
+            <div class="circle-label">of ${fmt(budget)}</div>
+            <div id="circle-left" class="circle-sublabel">${isOver ? '⚠ over' : fmt(left)+' left'}</div>
+          </div>
+        </div>
+        <div class="pill-row">
+          <div class="pill">
+            <div class="pill-label">Budget</div>
+            <div class="pill-value">${fmt(budget)}</div>
+          </div>
+          <div class="pill">
+            <div id="pill-saved-label" class="pill-label">${isOver ? 'Over by' : 'Saved today'}</div>
+            <div id="pill-saved" class="pill-value" style="color:${isOver ? 'var(--red)' : 'var(--green)'}">${fmt(Math.abs(left))}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🛒 Groceries this week</div>
+      <div class="groc-bar-wrap">
+        <div class="groc-bar-labels">
+          <span id="groc-spent">${fmt(gSpent)} spent</span>
+          <span style="color:${gOver?'var(--red)':'var(--muted)'}">of ${fmt(gBudget)} budget</span>
+        </div>
+        <div class="groc-bar"><div id="groc-fill" class="groc-bar-fill ${gOver?'over':''}" style="width:${gPct*100}%"></div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:0.8rem">
+        <span class="muted">Week ${wi>=0?wi+1:'?'} · resets ${wi>=0?md(WEEKS[wi].end):''}</span>
+        <span id="groc-left" style="color:${gOver?'var(--red)':'var(--groc)'}; font-weight:700">${gOver ? fmt(gSpent-gBudget)+' over' : fmt(gLeft)+' left'}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Log a spend</div>
+      <div class="quick-input">
+        <input type="number" id="q-amt" placeholder="$0.00" min="0" step="0.01" inputmode="decimal"
+          onkeydown="if(event.key==='Enter')logSpend()" />
+        <select id="q-cat">
+          <option value="Daily Spend">Daily</option>
+          <option value="Groceries">Groceries</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="quick-input" style="margin-bottom:0">
+        <input type="text" id="q-desc" placeholder="What was it? (optional)"
+          onkeydown="if(event.key==='Enter')logSpend()" style="flex:1" />
+        <button class="btn-add" onclick="logSpend()">Add</button>
+      </div>
+    </div>
+
+    <div class="card" id="today-log-card" ${todayTxs.length === 0 ? 'style="display:none"' : ''}>
+      <div class="card-title">Today's log</div>
+      <div id="today-log">${todayTxs.length > 0 ? `<div class="tx-list">${todayTxs.slice().reverse().map(t => txRow(t, true)).join('')}</div>` : ''}</div>
+    </div>
+  `;
+}
+
+function logSpend() {
+  const amtInput = document.getElementById('q-amt');
+  const amt = parseFloat(amtInput?.value);
+  if (!amt || amt <= 0) { amtInput?.focus(); return; }
+  const cat = document.getElementById('q-cat')?.value || 'Daily Spend';
+  const desc = document.getElementById('q-desc')?.value || '';
+  txs.push({ id: Date.now(), amount: amt, description: desc, category: cat, date: today() });
+  persist('txs', txs);
+  // Re-render just the page content (nav stays, no flicker)
+  document.getElementById('app').innerHTML = renderToday();
+  document.getElementById('q-amt').focus();
+}
+window.logSpend = logSpend;
+
+// ── SAVINGS ───────────────────────────────────────────────────────────────────
+function renderSavings() {
+  const td = today();
+  const dailySaved = totalDailySaved();
+  const grocSaved = totalGrocSaved();
+  const total = dailySaved + grocSaved;
+
+  // Build per-day savings for past days
+  const days = allTrackedPastDays().reverse(); // most recent first
+
+  return `
+    <h1>Savings Tracker</h1>
+    <p class="subtitle">Money you kept under budget each day</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="card" style="margin-bottom:0;text-align:center;padding:14px 8px">
+        <div class="card-title" style="margin-bottom:6px">Daily</div>
+        <div style="font-size:1.3rem;font-weight:800;color:var(--green)">${fmt(dailySaved)}</div>
+      </div>
+      <div class="card" style="margin-bottom:0;text-align:center;padding:14px 8px">
+        <div class="card-title" style="margin-bottom:6px">Grocery</div>
+        <div style="font-size:1.3rem;font-weight:800;color:var(--groc)">${fmt(grocSaved)}</div>
+      </div>
+      <div class="card" style="margin-bottom:0;text-align:center;padding:14px 8px">
+        <div class="card-title" style="margin-bottom:6px">Total</div>
+        <div style="font-size:1.3rem;font-weight:800;color:var(--accent)">${fmt(total)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Daily savings log</div>
+      ${days.map(({date, wi}) => {
+        const budget = DAILY_BUDGET(date);
+        const spent = spendOn(date, 'Daily Spend');
+        const saved = budget - spent;
+        const isOver = saved < 0;
+        const isToday = date === td;
+        return `<div class="savings-row">
+          <span class="savings-day">${dayName(date)} ${md(date)}${isToday?' · today':''}</span>
+          <span style="font-size:0.75rem;color:var(--muted)">${fmt(spent)} / ${fmt(budget)}</span>
+          <span class="savings-amt" style="color:${isOver?'var(--red)':'var(--green)'}">${isOver ? '–'+fmt(-saved) : '+'+fmt(saved)}</span>
+        </div>`;
+      }).join('')}
+      <div class="savings-total-row">
+        <span>Daily total saved</span>
+        <span style="color:var(--green)">${fmt(dailySaved)}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Grocery savings by week</div>
+      ${WEEKS.map((w,wi) => {
+        const isPast = w.end < td;
+        const isCurrent = td >= w.start && td <= w.end;
+        const gBudget = GROC_BUDGET(wi);
+        const gSpent = spendWeek(wi,'Groceries');
+        const saved = gBudget - gSpent;
+        const isOver = saved < 0;
+        if (!isPast && !isCurrent) return `<div class="savings-row"><span class="savings-day">${w.label}</span><span class="muted">upcoming</span><span class="muted">—</span></div>`;
+        return `<div class="savings-row">
+          <span class="savings-day">${w.label}${isCurrent?' · now':''}</span>
+          <span style="font-size:0.75rem;color:var(--muted)">${fmt(gSpent)} / ${fmt(gBudget)}</span>
+          <span class="savings-amt" style="color:${isOver?'var(--red)': isCurrent ? 'var(--groc)':'var(--green)'}">${isOver ? '–'+fmt(-saved) : (isCurrent?'':'+') + fmt(saved)}</span>
+        </div>`;
+      }).join('')}
+      <div class="savings-total-row">
+        <span>Grocery total saved</span>
+        <span style="color:var(--groc)">${fmt(grocSaved)}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── WEEK ──────────────────────────────────────────────────────────────────────
+function renderWeek() {
+  const td = today();
+  const wi = weekIdx(td);
+  if (wi < 0) return '<p class="empty">Not in a tracked week.</p>';
+  const dates = weekDates(wi);
+  const gBudget = GROC_BUDGET(wi);
+  const gSpent = spendWeek(wi,'Groceries');
+  const dailySpent = spendWeek(wi,'Daily Spend');
+  const totalBudget = WEEKS[wi].dailyBudget + gBudget;
+  const totalSpent = dailySpent + gSpent;
+
+  const thu25Logged = txs.some(t => t.date === '2026-06-25' && t.category === 'Daily Spend');
+
+  return `
+    <h1>${WEEKS[wi].label}</h1>
+    <p class="subtitle">${md(WEEKS[wi].start)} – ${md(WEEKS[wi].end)}</p>
+
+    ${!thu25Logged ? `
+    <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span style="font-size:0.82rem;color:var(--yellow)">⚠ You spent <strong>$61</strong> on Thu Jun 25 — not logged yet</span>
+      <button onclick="addYesterday61()" style="background:var(--yellow);color:#000;border:none;border-radius:7px;padding:6px 14px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Add it</button>
+    </div>` : ''}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="card" style="margin-bottom:0;padding:12px;text-align:center">
+        <div class="card-title" style="margin-bottom:4px">Budget</div>
+        <div style="font-size:1.1rem;font-weight:800">${fmt(totalBudget)}</div>
+      </div>
+      <div class="card" style="margin-bottom:0;padding:12px;text-align:center">
+        <div class="card-title" style="margin-bottom:4px">Spent</div>
+        <div style="font-size:1.1rem;font-weight:800;color:${totalSpent>totalBudget?'var(--red)':''}">${fmt(totalSpent)}</div>
+      </div>
+      <div class="card" style="margin-bottom:0;padding:12px;text-align:center">
+        <div class="card-title" style="margin-bottom:4px">${totalSpent>totalBudget?'Over':'Left'}</div>
+        <div style="font-size:1.1rem;font-weight:800;color:${totalSpent>totalBudget?'var(--red)':'var(--green)'}">${fmt(Math.abs(totalBudget-totalSpent))}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Daily spend</div>
+      <div class="day-grid">
+        ${dates.map(d => {
+          const isToday = d === td;
+          const isFuture = d > td;
+          const db = DAILY_BUDGET(d);
+          const ds = spendOn(d,'Daily Spend');
+          const sv = db - ds;
+          const isOver = ds > db && !isFuture;
+          const hasSaved = sv > 0 && ds > 0;
+          return `<div class="day-cell ${isToday?'today':''} ${isOver?'over':hasSaved?'saved':''}">
+            <div class="dc-name">${dayName(d)}</div>
+            <div class="dc-date">${md(d).split(' ')[1]}</div>
+            <div class="dc-spent" style="color:${isFuture&&!ds?'var(--muted)':isOver?'var(--red)':ds>0?'var(--text)':'var(--muted)'}">${isFuture&&!ds?'—':fmt(ds)}</div>
+            ${!isFuture&&ds>0 ? `<div class="dc-saved" style="color:${isOver?'var(--red)':'var(--green)'}">${isOver?'▲'+fmt(-sv):'▼'+fmt(sv)}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🛒 Groceries this week</div>
+      <div class="groc-bar-labels" style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:6px">
+        <span>${fmt(gSpent)} spent</span>
+        <span class="muted">of ${fmt(gBudget)}</span>
+      </div>
+      <div class="groc-bar"><div class="groc-bar-fill ${gSpent>gBudget?'over':''}" style="width:${Math.min(gSpent/gBudget,1)*100}%"></div></div>
+      <div style="text-align:right;margin-top:6px;margin-bottom:14px;font-size:0.8rem;font-weight:700;color:${gSpent>gBudget?'var(--red)':'var(--groc)'}">
+        ${gSpent>gBudget ? fmt(gSpent-gBudget)+' over' : fmt(gBudget-gSpent)+' left'}
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:0.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Log grocery spend</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="g-amt" placeholder="$0.00" min="0" step="0.01" inputmode="decimal"
+            onkeydown="if(event.key==='Enter')logGroc(${wi})"
+            style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:9px;font-size:1rem;outline:none" />
+          <input type="text" id="g-desc" placeholder="e.g. Safeway, Trader Joe's"
+            onkeydown="if(event.key==='Enter')logGroc(${wi})"
+            style="flex:2;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:9px;font-size:0.9rem;outline:none" />
+          <button onclick="logGroc(${wi})" style="background:var(--groc);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:0.9rem;font-weight:700;cursor:pointer;white-space:nowrap">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Log a daily spend</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="w-amt" placeholder="$0.00" min="0" step="0.01" inputmode="decimal"
+          onkeydown="if(event.key==='Enter')logWeekDay()"
+          style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:9px;font-size:1rem;outline:none" />
+        <select id="w-day" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 8px;border-radius:9px;font-size:0.82rem;outline:none">
+          ${dates.map(d => `<option value="${d}" ${d===td?'selected':''}>${dayName(d)} ${md(d).split(' ')[1]}</option>`).join('')}
+        </select>
+        <button onclick="logWeekDay()" style="background:var(--accent);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:0.9rem;font-weight:700;cursor:pointer">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">This week's log</div>
+      <div class="tx-list">${txs.filter(t=>t.date>=WEEKS[wi].start&&t.date<=WEEKS[wi].end).slice().reverse().map(t=>txRow(t,true)).join('') || '<p class="empty">Nothing logged yet</p>'}</div>
+    </div>
+  `;
+}
+
+function addYesterday61() {
+  txs.push({ id: Date.now(), amount: 61, description: 'Thu Jun 25 spend', category: 'Daily Spend', date: '2026-06-25' });
+  persist('txs', txs);
+  document.getElementById('app').innerHTML = renderWeek();
+}
+window.addYesterday61 = addYesterday61;
+
+function logGroc(wi) {
+  const amt = parseFloat(document.getElementById('g-amt')?.value);
+  if (!amt || amt <= 0) { document.getElementById('g-amt').focus(); return; }
+  const desc = document.getElementById('g-desc')?.value || 'Groceries';
+  txs.push({ id: Date.now(), amount: amt, description: desc, category: 'Groceries', date: today() });
+  persist('txs', txs);
+  document.getElementById('app').innerHTML = renderWeek();
+}
+window.logGroc = logGroc;
+
+function logWeekDay() {
+  const amt = parseFloat(document.getElementById('w-amt')?.value);
+  if (!amt || amt <= 0) { document.getElementById('w-amt').focus(); return; }
+  const date = document.getElementById('w-day')?.value || today();
+  txs.push({ id: Date.now(), amount: amt, description: '', category: 'Daily Spend', date });
+  persist('txs', txs);
+  document.getElementById('app').innerHTML = renderWeek();
+}
+window.logWeekDay = logWeekDay;
+
+// ── OVERVIEW ─────────────────────────────────────────────────────────────────
+function renderOverview() {
+  const td = today();
+  const totalTracked = txs.filter(t=>t.category!=='Other').reduce((s,t)=>s+t.amount,0);
+  const remaining = START_BAL - HOUSING - totalTracked;
+
+  return `
+    <h1>Overview</h1>
+    <p class="subtitle">6-week budget · starts Jun 22</p>
+
+    <div class="card">
+      <div class="row"><span class="muted">Starting balance</span><span style="font-weight:700">${fmt(START_BAL)}</span></div>
+      <div class="row"><span class="muted">Housing</span><span class="red">−${fmt(HOUSING)}</span></div>
+      <div class="row"><span class="muted">Spent (tracked)</span><span class="red">−${fmt(totalTracked)}</span></div>
+      <div class="row"><span style="font-weight:700">Remaining</span><span style="font-weight:800;color:var(--green)">${fmt(remaining)}</span></div>
+      <div class="row"><span class="muted">Savings goal</span><span class="muted">${fmt(SAVINGS_GOAL)}</span></div>
+      <div class="row"><span style="font-weight:700">Above goal</span><span style="font-weight:800;color:${remaining-SAVINGS_GOAL>=0?'var(--green)':'var(--red)'}">${fmt(remaining-SAVINGS_GOAL)}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">By week</div>
+      <table class="ov-table">
+        <thead><tr><th>Week</th><th>Daily</th><th>Groc</th><th></th></tr></thead>
+        <tbody>${WEEKS.map((w,i)=>{
+          const isCur = td>=w.start&&td<=w.end;
+          const isFut = w.start>td;
+          const gB = GROC_BUDGET(i);
+          const daily = spendWeek(i,'Daily Spend');
+          const groc = spendWeek(i,'Groceries');
+          const tot = daily+groc;
+          const fullB = w.dailyBudget+gB;
+          const isOver = tot>fullB;
+          const badge = isFut?'' : isCur?'<span class="badge now">NOW</span>' : isOver?'<span class="badge over">OVER</span>':'<span class="badge ok">OK</span>';
+          return `<tr>
+            <td><strong>${w.label}</strong><br><span style="font-size:0.68rem;color:var(--muted)">${md(w.start)}–${md(w.end)}</span></td>
+            <td style="color:${daily>w.dailyBudget?'var(--red)':''}">${isFut?'—':fmt(daily)}</td>
+            <td style="color:${groc>gB?'var(--red)':'var(--groc)'}">${isFut?'—':fmt(groc)}</td>
+            <td>${badge}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────────
+function renderHistory() {
+  const sorted = [...txs].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  return `
+    <h1>History</h1>
+    <p class="subtitle">${txs.length} transactions</p>
+    <div class="card">
+      ${sorted.length ? `<div class="tx-list">${sorted.map(t=>txRow(t,true)).join('')}</div>` : '<p class="empty">Nothing yet</p>'}
+    </div>
+  `;
+}
+
+function txRow(t, showDel=true) {
+  const icon = t.category==='Daily Spend'?'💳':t.category==='Groceries'?'🛒':'📌';
+  return `<div class="tx-item">
+    <span class="tx-icon">${icon}</span>
+    <span class="tx-desc">${t.description||t.category}</span>
+    <span class="tx-meta">${md(t.date)}</span>
+    <span class="tx-amount">${fmt(t.amount)}</span>
+    ${showDel?`<button class="btn-del" onclick="delTx(${t.id})">✕</button>`:''}
+  </div>`;
+}
+
+function delTx(id) {
+  txs = txs.filter(t=>t.id!==id);
+  persist('txs', txs);
+  render();
+}
+window.delTx = delTx;
+
+// Seed known past transactions if not already present
+const SEED = [
+  { id: 'seed-0622', amount: 7.83,  description: 'Lime rides',                              category: 'Daily Spend', date: '2026-06-22' },
+  { id: 'seed-0623', amount: 92.91, description: 'SAJJ Med $29 + Shoreline $21 + rides $43', category: 'Daily Spend', date: '2026-06-23' },
+  { id: 'seed-0624', amount: 75.63, description: '405 Howard $26 + 7-Eleven $6 + rides $43', category: 'Daily Spend', date: '2026-06-24' },
+  { id: 'seed-0625', amount: 61,    description: 'Thu Jun 25 spend',                          category: 'Daily Spend', date: '2026-06-25' },
+];
+SEED.forEach(s => { if (!txs.some(t => t.id === s.id)) txs.push(s); });
+persist('txs', txs);
+
+render();
+</script>
+</body>
+</html>
