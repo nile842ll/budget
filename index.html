@@ -729,9 +729,25 @@ function applySeed() {
   SEED.forEach(s => { if (!txs.some(t => t.id === s.id)) txs.push(s); });
 }
 
+async function migrateLocalStorage() {
+  let local = [];
+  try { local = JSON.parse(localStorage.getItem('txs')) || []; } catch { return; }
+  const userTxs = local.filter(t => typeof t.id === 'number');
+  if (userTxs.length === 0) return;
+  const batch = db.batch();
+  userTxs.forEach(t => {
+    const ref = db.collection(TX_COL).doc(String(t.id));
+    batch.set(ref, t);
+  });
+  await batch.commit();
+  localStorage.removeItem('txs'); // clear after migration so it doesn't re-run
+  console.log(`Migrated ${userTxs.length} transactions to Firebase`);
+}
+
 async function initApp() {
   document.getElementById('app').innerHTML = '<p style="text-align:center;padding:40px;color:var(--muted)">Loading…</p>';
   try {
+    await migrateLocalStorage();
     const snap = await db.collection(TX_COL).get();
     txs = snap.docs.map(d => d.data());
   } catch(e) {
