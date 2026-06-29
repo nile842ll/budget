@@ -126,6 +126,8 @@
 <body>
 <div class="app" id="app"></div>
 <nav class="bottom-nav" id="nav"></nav>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
 const WEEKS = [
@@ -145,11 +147,29 @@ const HOUSING = 6500;
 const START_BAL = 14121;
 const SAVINGS_GOAL = 1000;
 
+// ── Firebase ──────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAMrwfAfTJTXKTpkHfqy2WCKKVeYqe8WBM",
+  authDomain: "budget-sf-26.firebaseapp.com",
+  projectId: "budget-sf-26",
+  storageBucket: "budget-sf-26.firebasestorage.app",
+  messagingSenderId: "210037531436",
+  appId: "1:210037531436:web:afd32ebaab2197cfe18289"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const TX_COL = 'transactions';
+
 // ── Storage ───────────────────────────────────────────────────────────────────
-const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
-const persist = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-let txs = load('txs', []);
+let txs = [];
 let page = 'today';
+
+async function saveTx(tx) {
+  await db.collection(TX_COL).doc(String(tx.id)).set(tx);
+}
+async function removeTx(id) {
+  await db.collection(TX_COL).doc(String(id)).delete();
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (n) => '$' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -326,15 +346,15 @@ function renderToday() {
   `;
 }
 
-function logSpend() {
+async function logSpend() {
   const amtInput = document.getElementById('q-amt');
   const amt = parseFloat(amtInput?.value);
   if (!amt || amt <= 0) { amtInput?.focus(); return; }
   const cat = document.getElementById('q-cat')?.value || 'Daily Spend';
   const desc = document.getElementById('q-desc')?.value || '';
-  txs.push({ id: Date.now(), amount: amt, description: desc, category: cat, date: today() });
-  persist('txs', txs);
-  // Re-render just the page content (nav stays, no flicker)
+  const tx = { id: Date.now(), amount: amt, description: desc, category: cat, date: today() };
+  txs.push(tx);
+  saveTx(tx);
   document.getElementById('app').innerHTML = renderToday();
   document.getElementById('q-amt').focus();
 }
@@ -578,29 +598,32 @@ function renderWeek() {
   `;
 }
 
-function addYesterday61() {
-  txs.push({ id: Date.now(), amount: 61, description: 'Thu Jun 25 spend', category: 'Daily Spend', date: '2026-06-25' });
-  persist('txs', txs);
+async function addYesterday61() {
+  const tx = { id: Date.now(), amount: 61, description: 'Thu Jun 25 spend', category: 'Daily Spend', date: '2026-06-25' };
+  txs.push(tx);
+  saveTx(tx);
   document.getElementById('app').innerHTML = renderWeek();
 }
 window.addYesterday61 = addYesterday61;
 
-function logGroc(wi) {
+async function logGroc(wi) {
   const amt = parseFloat(document.getElementById('g-amt')?.value);
   if (!amt || amt <= 0) { document.getElementById('g-amt').focus(); return; }
   const desc = document.getElementById('g-desc')?.value || 'Groceries';
-  txs.push({ id: Date.now(), amount: amt, description: desc, category: 'Groceries', date: today() });
-  persist('txs', txs);
+  const tx = { id: Date.now(), amount: amt, description: desc, category: 'Groceries', date: today() };
+  txs.push(tx);
+  saveTx(tx);
   document.getElementById('app').innerHTML = renderWeek();
 }
 window.logGroc = logGroc;
 
-function logWeekDay() {
+async function logWeekDay() {
   const amt = parseFloat(document.getElementById('w-amt')?.value);
   if (!amt || amt <= 0) { document.getElementById('w-amt').focus(); return; }
   const date = document.getElementById('w-day')?.value || today();
-  txs.push({ id: Date.now(), amount: amt, description: '', category: 'Daily Spend', date });
-  persist('txs', txs);
+  const tx = { id: Date.now(), amount: amt, description: '', category: 'Daily Spend', date };
+  txs.push(tx);
+  saveTx(tx);
   document.getElementById('app').innerHTML = renderWeek();
 }
 window.logWeekDay = logWeekDay;
@@ -673,9 +696,9 @@ function txRow(t, showDel=true) {
   </div>`;
 }
 
-function delTx(id) {
+async function delTx(id) {
   txs = txs.filter(t=>t.id!==id);
-  persist('txs', txs);
+  removeTx(id);
   render();
 }
 window.delTx = delTx;
@@ -699,14 +722,27 @@ const SEED = [
   // Week 4 groceries
   { id: 'seed-w4-groc', amount: 105, description: 'Week 4 groceries', category: 'Groceries', date: '2026-06-25' },
 ];
-// Remove any old seed versions before re-seeding
-const SEED_IDS_ALL = ['seed-w1-daily','seed-w1-groc','seed-w2-daily','seed-w2-groc','seed-w3-daily','seed-w3-groc',
-  'seed-w1-daily-v2','seed-w1-groc-v2','seed-w2-daily-v2','seed-w2-groc-v2','seed-w3-daily-v2','seed-w3-groc-v2'];
-txs = txs.filter(t => !SEED_IDS_ALL.includes(t.id));
-SEED.forEach(s => { if (!txs.some(t => t.id === s.id)) txs.push(s); });
-persist('txs', txs);
+function applySeed() {
+  const SEED_IDS_ALL = ['seed-w1-daily','seed-w1-groc','seed-w2-daily','seed-w2-groc','seed-w3-daily','seed-w3-groc',
+    'seed-w1-daily-v2','seed-w1-groc-v2','seed-w2-daily-v2','seed-w2-groc-v2','seed-w3-daily-v2','seed-w3-groc-v2'];
+  txs = txs.filter(t => !SEED_IDS_ALL.includes(t.id));
+  SEED.forEach(s => { if (!txs.some(t => t.id === s.id)) txs.push(s); });
+}
 
-render();
+async function initApp() {
+  document.getElementById('app').innerHTML = '<p style="text-align:center;padding:40px;color:var(--muted)">Loading…</p>';
+  try {
+    const snap = await db.collection(TX_COL).get();
+    txs = snap.docs.map(d => d.data());
+  } catch(e) {
+    console.warn('Firestore load failed, using localStorage', e);
+    try { txs = JSON.parse(localStorage.getItem('txs')) || []; } catch { txs = []; }
+  }
+  applySeed();
+  render();
+}
+
+initApp();
 </script>
 </body>
 </html>
