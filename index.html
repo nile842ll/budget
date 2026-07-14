@@ -130,14 +130,19 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const WEEKS = [
-  { label:'Week 1', start:'2026-06-01', end:'2026-06-07', dailyBudget:385 },
-  { label:'Week 2', start:'2026-06-08', end:'2026-06-14', dailyBudget:385 },
-  { label:'Week 3', start:'2026-06-15', end:'2026-06-21', dailyBudget:385 },
-  { label:'Week 4', start:'2026-06-22', end:'2026-06-28', dailyBudget:385 },
-  { label:'Week 5', start:'2026-06-29', end:'2026-07-05', dailyBudget:385 },
-  { label:'Week 6', start:'2026-07-06', end:'2026-07-12', dailyBudget:385 },
-];
+const TRIP_START = '2026-06-01'; // first tracked Monday
+const TRIP_END   = '2026-08-16'; // last tracked day
+const WEEKS = (() => {
+  const weeks = [];
+  const d = new Date(TRIP_START + 'T12:00:00');
+  for (let i = 1; d.toISOString().slice(0,10) <= TRIP_END; i++) {
+    const start = d.toISOString().slice(0,10);
+    d.setDate(d.getDate() + 6);
+    weeks.push({ label:'Week '+i, start, end:d.toISOString().slice(0,10), dailyBudget:385 });
+    d.setDate(d.getDate() + 1);
+  }
+  return weeks;
+})();
 const GROC_BUDGET = (wi) => wi === 0 ? 250 : 90;
 const DAILY_BUDGET = (dateStr) => {
   const day = new Date(dateStr + 'T12:00:00').getDay();
