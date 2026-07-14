@@ -553,8 +553,10 @@ function renderWeek() {
           return `<div class="day-cell ${isToday?'today':''} ${isOver?'over':hasSaved?'saved':''}">
             <div class="dc-name">${dayName(d)}</div>
             <div class="dc-date">${md(d).split(' ')[1]}</div>
-            <div class="dc-spent" style="color:${isFuture&&!ds?'var(--muted)':isOver?'var(--red)':ds>0?'var(--text)':'var(--muted)'}">${isFuture&&!ds?'—':fmt(ds)}</div>
-            ${showDelta ? `<div class="dc-saved" style="color:${isOver?'var(--red)':'var(--green)'}">${isOver?'▼'+fmt(-sv):'▲'+fmt(sv)}</div>` : ''}
+            ${showDelta
+              ? `<div class="dc-spent" style="color:${isOver?'var(--red)':'var(--green)'}">${isOver?'▼'+fmt(-sv):'▲'+fmt(sv)}</div>
+                 <div class="dc-saved" style="color:var(--muted)">${fmt(ds)} spent</div>`
+              : `<div class="dc-spent" style="color:var(--muted)">${isFuture&&!ds?'—':fmt(ds)}</div>`}
           </div>`;
         }).join('')}
       </div>
