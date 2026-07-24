@@ -757,18 +757,25 @@ async function migrateLocalStorage() {
   console.log(`Migrated ${userTxs.length} transactions to Firebase`);
 }
 
+function fallbackLocal() {
+  try { txs = JSON.parse(localStorage.getItem('txs')) || []; } catch { txs = []; }
+  applySeed();
+  render();
+}
+
 async function initApp() {
   document.getElementById('app').innerHTML = '<p style="text-align:center;padding:40px;color:var(--muted)">Loading…</p>';
   try {
     await migrateLocalStorage();
-    const snap = await db.collection(TX_COL).get();
-    txs = snap.docs.map(d => d.data());
+    // Live listener: re-renders automatically whenever data changes on any device
+    db.collection(TX_COL).onSnapshot(
+      snap => { txs = snap.docs.map(d => d.data()); applySeed(); render(); },
+      err => { console.warn('Firestore live sync failed, using localStorage', err); fallbackLocal(); }
+    );
   } catch(e) {
-    console.warn('Firestore load failed, using localStorage', e);
-    try { txs = JSON.parse(localStorage.getItem('txs')) || []; } catch { txs = []; }
+    console.warn('Init failed, using localStorage', e);
+    fallbackLocal();
   }
-  applySeed();
-  render();
 }
 
 initApp();
